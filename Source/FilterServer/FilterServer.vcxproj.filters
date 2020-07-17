@@ -11,4 +11,9 @@
       <Filter>Sources</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CmdFilter.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

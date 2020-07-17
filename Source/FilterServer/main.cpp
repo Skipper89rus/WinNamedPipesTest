@@ -5,12 +5,29 @@
 #include "WinNamedPipe/WinNamedPipeProvider.h"
 #include "WinNamedPipe/WinErrHelper.h"
 
+#include "CmdFilter.h"
+
 
 const std::string PIPE_NAME = "filter_pipe";
+
+const std::vector<std::string> CMD_FILTER_REGEXES =
+{
+   "ping\\s+yandex.*", "dir"
+};
+
 
 int main()
 {
    std::cout << "Filter server initializing..." << std::endl;
+
+   CmdFilter cmdFilter = CmdFilter();
+   if ( !cmdFilter.Init(CMD_FILTER_REGEXES) )
+   {
+      std::cerr << "Filter server initializing failed: some of filter expressions are invalid" << std::endl;
+      std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
+      return 1;
+   }
+
    WinPipeProvider pipe = WinPipeProvider();
    if ( !pipe.Create(PIPE_NAME) )
    {
@@ -43,6 +60,8 @@ int main()
       std::string out = c;
       if (c == "\r") // Enter
       {
+         if (cmdFilter.IsForbidden(command))
+            out = "Commnd '" + command + "' forbidden";
          command.clear();
          std::cout << std::endl << out << std::endl;
       }
