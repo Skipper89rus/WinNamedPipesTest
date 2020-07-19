@@ -2,7 +2,7 @@
 
 namespace win_pipes_io
 {
-   const DWORD MAX_MSG_LEN = 4096;
+   const DWORD MAX_MSG_LEN = 1024;
 
    inline bool write_to_pipe(HANDLE h, const std::string& str)
    {

@@ -12,6 +12,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CmdProcessor.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
     <ClInclude Include="CmdFilter.h">
       <Filter>Sources</Filter>
     </ClInclude>
