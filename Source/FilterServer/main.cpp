@@ -41,15 +41,12 @@ int main()
       return 1;
 
    CmdProcessor cmdProcessor = CmdProcessor();
-   // Init commands processor
-   if ( !win_console_helper::formatted_err_func_call([&cmdProcessor]() { return cmdProcessor.Init(); },
-                                                     "Filter server initializing failed: can't init commands processor") )
-      return 1;
 
    std::cout << "Waiting client connection..." << std::endl;
    pipe.WaitConnection();
-   std::cout << "Client connected" << std::endl << std::endl;
+   std::cout << "Client connected" << std::endl;
 
+   std::cout << std::endl << "Client typing..." << std::endl;
    std::string command;
    do
    {
@@ -74,12 +71,15 @@ int main()
       std::string out = c;
       if (c == "\r") // Enter
       {
+         std::cout << std::endl << std::endl;
+         std::cout << "Command output:" << std::endl;
          if (cmdFilter.IsForbidden(command))
             out = "Commnd '" + command + "' forbidden";
          else if ( !try_exec_command(&cmdProcessor, command, out) )
             out = "Commnd '" + command + "' execution failed";
          command.clear();
-         std::cout << std::endl << out << std::endl;
+         std::cout << out << std::endl << std::endl;
+         std::cout << "Client typing..." << std::endl;
       }
       else if (c == "\b")
       {

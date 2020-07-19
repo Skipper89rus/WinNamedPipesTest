@@ -11,21 +11,34 @@
 class CmdProcessor
 {
 public:
-   ~CmdProcessor()
-   {
-      deinit();
-   }
-
-   bool Init()
-   {
-      return createCmdIOPipes() && createCmdProc();
-   }
-
    bool ExecCommand(const std::string& command, std::string& output)
    {
-      if (_hCmdProc == nullptr || _hCmdThr == INVALID_HANDLE_VALUE)
+      if ( !createCmdIOPipes() )
+      {
+         deinit();
          return false;
-       return sendCommand(command) && getCommandOut(output);
+      }
+
+      if ( !execCmdCommand(command) )
+      {
+         deinit();
+         return false;
+      }
+
+      // Close handles to the child process and its primary thread
+      // Some applications might keep these handles to monitor the status of the child process, for example
+      closeHandle(_hCmdProc);
+      closeHandle(_hCmdThr);
+      // Close handles to the stdin and stdout pipes no longer needed by the child process
+      // If they are not explicitly closed, there is no way to recognize that the child process has ended
+      closeHandle(_hCmdOutW);
+      closeHandle(_hCmdInR);
+      // Close the pipe handle so the child process stops reading
+      closeHandle(_hCmdInW);
+
+      bool isSuccess = getCommandOut(output);
+      deinit();
+      return isSuccess;
    }
 
 private:
@@ -42,7 +55,7 @@ private:
       return true;
    }
 
-   bool createCmdProc()
+   bool execCmdCommand(const std::string& command)
    {
       STARTUPINFO startInfo;
       ZeroMemory(&startInfo, sizeof(STARTUPINFO));
@@ -55,8 +68,10 @@ private:
       PROCESS_INFORMATION procInfo;
       ZeroMemory(&procInfo, sizeof(PROCESS_INFORMATION));
 
-      LPSTR cmd = _strdup("cmd.exe /K");
-      if ( !CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &startInfo, &procInfo) )
+      LPSTR cmd = _strdup(("cmd /C " + command).c_str()); // CreateProcess uses LPSTR command line
+      BOOL isSuccess = CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &startInfo, &procInfo);
+      free(cmd);
+      if ( !isSuccess )
          return false;
 
       _hCmdProc = procInfo.hProcess;
@@ -64,19 +79,12 @@ private:
       return true;
    }
 
-   bool sendCommand(const std::string& command) const
-   {
-      std::string c = "cmd.exe /K " + command + "\r\n";
-      if ( !win_pipes_io::write_to_pipe(_hCmdInW, c) )
-         return false;
-
-      Sleep(1000); // TODO: How to wait?
-      return true;
-   }
-
    bool getCommandOut(std::string& out) const
    {
-      return win_pipes_io::read_from_pipe(_hCmdOutR, out);
+      std::string o;
+      while (win_pipes_io::read_from_pipe(_hCmdOutR, o))
+         out += o;
+      return true;
    }
 
    SECURITY_ATTRIBUTES getSecurityAttrs() const
