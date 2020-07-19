@@ -13,10 +13,10 @@
     <ClInclude Include="WinNamedPipe\WinNamedPipeProvider.h">
       <Filter>Sources\WinNamedPipe</Filter>
     </ClInclude>
-    <ClInclude Include="WinNamedPipe\WinErrHelper.h">
+    <ClInclude Include="WinNamedPipe\WinPipesIOHelper.h">
       <Filter>Sources\WinNamedPipe</Filter>
     </ClInclude>
-    <ClInclude Include="WinNamedPipe\WinPipesIOHelper.h">
+    <ClInclude Include="WinNamedPipe\WinConsoleHelper.h">
       <Filter>Sources\WinNamedPipe</Filter>
     </ClInclude>
   </ItemGroup>

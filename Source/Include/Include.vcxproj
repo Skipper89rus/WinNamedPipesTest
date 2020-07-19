@@ -52,7 +52,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="WinNamedPipe\WinErrHelper.h" />
+    <ClInclude Include="WinNamedPipe\WinConsoleHelper.h" />
     <ClInclude Include="WinNamedPipe\WinNamedPipeProvider.h" />
     <ClInclude Include="WinNamedPipe\WinPipesIOHelper.h" />
   </ItemGroup>

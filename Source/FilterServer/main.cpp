@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "WinNamedPipe/WinNamedPipeProvider.h"
-#include "WinNamedPipe/WinErrHelper.h"
+#include "WinNamedPipe/WinConsoleHelper.h"
 
 #include "CmdFilter.h"
 #include "CmdProcessor.h"
@@ -19,36 +19,32 @@ const std::vector<std::string> CMD_FILTER_REGEXES =
 
 inline bool try_exec_command(CmdProcessor* pCmdProcessor, const std::string& command, std::string& out)
 {
-   if (pCmdProcessor->ExecCommand(command, out))
-      return true;
-   std::cerr << "Commnd '" + command + "' execution failed" << std::endl;
-   std::cout << win_err_helper::fmt_err() << std::endl;
-   return false;
+   return win_console_helper::formatted_err_func_call(
+      [pCmdProcessor, &command, &out]() { return pCmdProcessor->ExecCommand(command, out); },
+      "Commnd '" + command + "' execution failed" );
 }
 
 int main()
 {
    std::cout << "Filter server initializing..." << std::endl;
+
    WinPipeProvider pipe = WinPipeProvider();
+   // Init server-side pipe
+   if ( !win_console_helper::formatted_err_func_call([&pipe]() { return pipe.Create(PIPE_NAME); },
+                                                    "Filter client initializing failed: can't connect to pipe") )
+      return 1;
 
    CmdFilter cmdFilter = CmdFilter();
-   if ( !cmdFilter.Init(CMD_FILTER_REGEXES) )
-   {
-      std::cerr << "Filter server initializing failed: some of filter expressions are invalid" << std::endl;
-      std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
+   // Init commands filter
+   if ( !win_console_helper::formatted_err_func_call([&cmdFilter]() { return cmdFilter.Init(CMD_FILTER_REGEXES); },
+                                                     "Filter server initializing failed: some of filter expressions are invalid") )
       return 1;
-   }
 
    CmdProcessor cmdProcessor = CmdProcessor();
-   cmdProcessor.Init();
-   cmdProcessor.~CmdProcessor();
-
-   if ( !pipe.Create(PIPE_NAME) )
-   {
-      std::cerr << "Filter server initializing failed: can't create pipe" << std::endl;
-      std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
+   // Init commands processor
+   if ( !win_console_helper::formatted_err_func_call([&cmdProcessor]() { return cmdProcessor.Init(); },
+                                                     "Filter server initializing failed: can't init commands processor") )
       return 1;
-   }
 
    std::cout << "Waiting client connection..." << std::endl;
    pipe.WaitConnection();
@@ -58,13 +54,15 @@ int main()
    do
    {
       std::string c;
-      if ( !pipe.TryReadMsg(c) )
+      // Reading msg from client
+      if ( !win_console_helper::formatted_err_func_call([&pipe, &c]() { return pipe.TryReadMsg(c); },
+                                                        "Failed to read message from client") )
       {
-         std::cout << "Failed to read message from client" << std::endl << std::endl;
-         std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
-
          std::cout << "Dropping client connection..." << std::endl;
-         pipe.Disconnect();
+         if ( !win_console_helper::formatted_err_func_call([&pipe]() { return pipe.Disconnect(); },
+                                                           "Dropping client connection failed") )
+
+         // Wait client connaction again
          std::cout << "Waiting client connection..." << std::endl;
          pipe.WaitConnection();
          std::cout << "Client connected" << std::endl << std::endl;
@@ -78,7 +76,7 @@ int main()
       {
          if (cmdFilter.IsForbidden(command))
             out = "Commnd '" + command + "' forbidden";
-         else if (!try_exec_command(&cmdProcessor, command, out))
+         else if ( !try_exec_command(&cmdProcessor, command, out) )
             out = "Commnd '" + command + "' execution failed";
          command.clear();
          std::cout << std::endl << out << std::endl;
@@ -95,11 +93,9 @@ int main()
          std::cout << c;
       }
 
-      if ( !pipe.SendMsg(out) )
-      {
-         std::cerr << "Sending test msg failed" << std::endl;
-         std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
-      }
+      win_console_helper::formatted_err_func_call([&pipe, &out]() { return pipe.SendMsg(out); },
+                                                  "Sending response to client failed");
+
    } while (true);
    return 0;
 }

@@ -3,21 +3,18 @@
 #include <iostream>
 
 #include "WinNamedPipe/WinNamedPipeProvider.h"
-#include "WinNamedPipe/WinErrHelper.h"
+#include "WinNamedPipe/WinConsoleHelper.h"
 
 const std::string PIPE_NAME = "filter_pipe";
 
 int main()
 {
    std::cout << "Filter client initializing...." << std::endl;
-   WinPipeProvider pipe = WinPipeProvider();
 
-   if ( !pipe.Connect(PIPE_NAME) )
-   {
-      std::cerr << "Filter client initializing failed: can't connect to pipe" << std::endl;
-      std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
+   WinPipeProvider pipe = WinPipeProvider();
+   if ( !win_console_helper::formatted_err_func_call([&pipe]() { return pipe.Connect(PIPE_NAME); },
+                                                     "Filter client initializing failed: can't connect to pipe") )
       return 1;
-   }
 
    std::cout << "Type command..." << std::endl;
    while (const char c = _getch())
@@ -29,12 +26,9 @@ int main()
       }
 
       std::string out;
-      if ( !pipe.Transact(PIPE_NAME, { c }, out) )
-      {
-         std::cerr << "Sending test msg failed" << std::endl;
-         std::cerr << "Error: " << win_err_helper::fmt_err() << std::endl;
+      if ( !win_console_helper::formatted_err_func_call([&pipe, c, &out]() { return pipe.Transact(PIPE_NAME, { c }, out); },
+                                                        "Sending request to server failed") )
          continue;
-      }
 
       std::cout << out;
       if (c == '\r') // Next line on Enter
