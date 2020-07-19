@@ -41,6 +41,10 @@ int main()
       return 1;
 
    CmdProcessor cmdProcessor = CmdProcessor();
+   // Init commands processor
+   if ( !win_console_helper::formatted_err_func_call([&cmdProcessor]() { return cmdProcessor.Init(); },
+                                                     "Filter server initializing failed: can't init commands processor") )
+      return 1;
 
    std::cout << "Waiting client connection..." << std::endl;
    pipe.WaitConnection();

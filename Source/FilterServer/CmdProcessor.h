@@ -11,34 +11,21 @@
 class CmdProcessor
 {
 public:
+   ~CmdProcessor()
+   {
+      deinit();
+   }
+
+   bool Init()
+   {
+      return createCmdIOPipes() && createCmdProc();
+   }
+
    bool ExecCommand(const std::string& command, std::string& output)
    {
-      if ( !createCmdIOPipes() )
-      {
-         deinit();
+      if (_hCmdProc == nullptr || _hCmdThr == INVALID_HANDLE_VALUE)
          return false;
-      }
-
-      if ( !execCmdCommand(command) )
-      {
-         deinit();
-         return false;
-      }
-
-      // Close handles to the child process and its primary thread
-      // Some applications might keep these handles to monitor the status of the child process, for example
-      closeHandle(_hCmdProc);
-      closeHandle(_hCmdThr);
-      // Close handles to the stdin and stdout pipes no longer needed by the child process
-      // If they are not explicitly closed, there is no way to recognize that the child process has ended
-      closeHandle(_hCmdOutW);
-      closeHandle(_hCmdInR);
-      // Close the pipe handle so the child process stops reading
-      closeHandle(_hCmdInW);
-
-      bool isSuccess = getCommandOut(output);
-      deinit();
-      return isSuccess;
+       return sendCommand(command) && getCommandOut(output);
    }
 
 private:
@@ -55,7 +42,7 @@ private:
       return true;
    }
 
-   bool execCmdCommand(const std::string& command)
+   bool createCmdProc()
    {
       STARTUPINFO startInfo;
       ZeroMemory(&startInfo, sizeof(STARTUPINFO));
@@ -68,10 +55,12 @@ private:
       PROCESS_INFORMATION procInfo;
       ZeroMemory(&procInfo, sizeof(PROCESS_INFORMATION));
 
-      LPSTR cmd = _strdup(("cmd /C " + command).c_str()); // CreateProcess uses LPSTR command line
-      BOOL isSuccess = CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &startInfo, &procInfo);
-      free(cmd);
-      if ( !isSuccess )
+      const DWORD cmdPathSz = 1024;
+      CHAR cmdPath[cmdPathSz];
+      if ( !GetEnvironmentVariable("COMSPEC", cmdPath, cmdPathSz) )
+         return false;
+
+      if ( !CreateProcess(cmdPath, NULL, NULL, NULL, TRUE, 0, NULL, NULL, &startInfo, &procInfo))
          return false;
 
       _hCmdProc = procInfo.hProcess;
@@ -79,11 +68,31 @@ private:
       return true;
    }
 
+   bool sendCommand(const std::string& command) const
+   {
+      std::string c = "\n\n" + command + "\n"; // TODO: How send one more command without "More?" question from CMD
+      return win_pipes_io::write_to_pipe(_hCmdInW, c);
+   }
+
    bool getCommandOut(std::string& out) const
    {
       std::string o;
-      while (win_pipes_io::read_from_pipe(_hCmdOutR, o))
+      do
+      {
+         Sleep(250);
+
+         DWORD availSz;
+         if ( !PeekNamedPipe(_hCmdOutR, NULL, 0, NULL, &availSz, NULL) )
+            return false;
+
+         if (availSz == 0)
+            break;
+
+         if ( !win_pipes_io::read_from_pipe(_hCmdOutR, o) )
+            return false;
+
          out += o;
+      } while (true);
       return true;
    }
 
